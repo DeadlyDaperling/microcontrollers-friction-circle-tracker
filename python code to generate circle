@@ -1,0 +1,64 @@
+import serial
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import numpy as np
+
+# Configure serial connection (change COM port as needed)
+# the case used here is COM5
+ser = serial.Serial('COM5', 9600, timeout=1)  # Change COM3 to your port
+
+# Data storage
+x_data = []  # Lateral force (left/right)
+y_data = []  # Longitudinal force (brake/accel)
+max_points = 1000  # Keep last 1000 points can be increased or decreased depending on lag
+
+# Create the figure and label axis
+fig, ax = plt.subplots(figsize=(8, 8))
+ax.set_xlim(-1.5, 1.5)
+ax.set_ylim(-1.5, 1.5)
+ax.set_xlabel('Lateral Force (g) - Left(-) / Right(+)')
+ax.set_ylabel('Longitudinal Force (g) - Brake(-) / Accel(+)')
+ax.set_title('Real time Friction Circle')
+ax.grid(True, alpha=0.3)
+ax.set_aspect('equal')
+
+# Draw reference circle at 1g in theory for motorcycles this is the max amount of friction the wheels can supply
+circle = plt.Circle((0, 0), 1.0, fill=False, color='red', linestyle='--', alpha=0.7)
+ax.add_patch(circle)
+
+# Initialize empty plot this portion was created using AI
+line, = ax.plot([], [], 'bo', markersize=2, alpha=0.6)
+
+def animate(frame):
+    global x_data, y_data
+    
+    if ser.in_waiting:
+        try:
+            line_data = ser.readline().decode('utf-8').strip()
+            if ',' in line_data:
+                parts = line_data.split(',')
+                if len(parts) == 2:
+                    x_val = float(parts[0])  # Lateral
+                    y_val = float(parts[1])  # Longitudinal
+                    
+                    x_data.append(x_val)
+                    y_data.append(y_val)
+                    
+                    # Keep only recent points
+                    if len(x_data) > max_points:
+                        x_data.pop(0)
+                        y_data.pop(0)
+                    
+                    # Update plot
+                    line.set_data(x_data, y_data)
+        except ValueError:
+            pass  # Skip invalid data
+    
+    return line,
+
+# Start animation
+ani = animation.FuncAnimation(fig, animate, interval=50, blit=True)
+plt.show()
+
+# Close serial when done
+ser.close()
