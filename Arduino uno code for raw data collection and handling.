@@ -1,0 +1,70 @@
+/*
+Friction Circle Tracker
+Micro controllers final project
+Thomas Michaelson 2026
+AI was used in the creation of this code
+*/
+#include <Wire.h>
+
+
+const int MPU = 0x68;
+float AccX, AccY, AccZ;
+float offsetX = 0, offsetY = 0; // Calibration offsets
+// Calibration is super useful, since it is almost impossible to ensure the devices are reading true level
+//this would be a super useful addition to the lectures or lab.
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+ 
+  Wire.beginTransmission(MPU);
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
+ 
+  Serial.println("Calibrating... Keep car level and still!");
+  delay(1000);
+ 
+  // Calibrate - average 100 readings
+  for(int i = 0; i < 100; i++) {
+    readAccel();
+    offsetX += AccX;
+    offsetY += AccY;
+    delay(10);
+  }
+  offsetX /= 100;
+  offsetY /= 100;
+ 
+  Serial.println("Ready");
+}
+
+
+void readAccel() {
+  Wire.beginTransmission(MPU);
+  Wire.write(0x3B);
+  Wire.endTransmission(false);
+  Wire.requestFrom(MPU, 6, true);
+ 
+  AccX = (Wire.read() << 8 | Wire.read()) / 16384.0;
+  AccY = (Wire.read() << 8 | Wire.read()) / 16384.0;
+  AccZ = (Wire.read() << 8 | Wire.read()) / 16384.0;
+}
+
+
+void loop() {
+  readAccel();
+ 
+  // Remove gravity offset to get vehicle acceleration
+  float vehicle_ax = AccX - offsetX;
+  float vehicle_ay = AccY - offsetY;
+ 
+  // X-axis: +right turn, -left turn
+  // Y-axis: +acceleration, -braking  
+  float lateral_force = vehicle_ay;      // Right(+) / Left(-)
+  float longitudinal_force = -vehicle_ax; // Accel(+) / Brake(-)
+ 
+  Serial.print(lateral_force, 3);
+  Serial.print(",");
+  Serial.println(longitudinal_force, 3);
+ //this delay controls the data collected per second, this can be increased or decreased depending on lag, and application
+  delay(100);
+}
